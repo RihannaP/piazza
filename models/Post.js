@@ -11,15 +11,16 @@ const interactionSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    type: { type: String, enum: ["like", "dislike", "comment"], required: true },
+    type: {
+      type: String,
+      enum: ["like", "dislike", "comment"],
+      required: true,
+    },
     value: { type: String }, // comment text if type=comment
-    timeLeftSeconds: { type: Number, required: true }
+    timeLeftSeconds: { type: Number, required: true },
   },
-  {timestamps: true }
+  { timestamps: true }
 );
-
-
-
 
 const postSchema = new mongoose.Schema(
   {

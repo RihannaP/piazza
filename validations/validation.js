@@ -1,4 +1,4 @@
-import joi from "joi"
+import joi from "joi";
 
 const registerValidation = (data) => {
   const schemaValidation = joi.object({
@@ -17,4 +17,4 @@ const loginValidation = (data) => {
   return schemaValidation.validate(data);
 };
 
-export {registerValidation, loginValidation}
+export { registerValidation, loginValidation };

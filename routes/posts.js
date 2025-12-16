@@ -66,9 +66,7 @@ router.post("/", auth, async (req, res) => {
   }
 });
 
-
-
-/// Like endpoint 
+/// Like endpoint
 
 router.post("/:id/like", auth, async (req, res) => {
   try {
@@ -107,7 +105,7 @@ router.post("/:id/like", auth, async (req, res) => {
         userId: req.user.userId,
         username: req.user.username,
         type: "like",
-        timeLeftSeconds : timeLeftSeconds(post),
+        timeLeftSeconds: timeLeftSeconds(post),
       });
     }
 
@@ -118,7 +116,7 @@ router.post("/:id/like", auth, async (req, res) => {
   }
 });
 
-/// Dislike endpoint 
+/// Dislike endpoint
 
 router.post("/:id/dislike", auth, async (req, res) => {
   try {
@@ -164,7 +162,6 @@ router.post("/:id/dislike", auth, async (req, res) => {
   }
 });
 
-
 ///Comment endpoint
 
 router.post("/:id/comment", auth, async (req, res) => {
@@ -196,10 +193,9 @@ router.post("/:id/comment", auth, async (req, res) => {
   }
 });
 
-// /posts/active/most-interesting?topic=Tech 
+// /posts/active/most-interesting?topic=Tech
 router.get("/active/most-interesting", auth, async (req, res) => {
   try {
-
     const { topic } = req.query;
     if (!topic)
       return res
@@ -234,11 +230,9 @@ router.get("/active/most-interesting", auth, async (req, res) => {
   }
 });
 
-
-// /posts/expired?topic=Tech 
+// /posts/expired?topic=Tech
 router.get("/expired", auth, async (req, res) => {
   try {
-
     const { topic } = req.query;
     if (!topic)
       return res
@@ -276,12 +270,11 @@ router.get("/", auth, async (req, res) => {
       return res.status(400).json({ error: "Invalid topic" });
     }
 
-   //auto mark expired
+    //auto mark expired
     await Post.updateMany(
       { status: "Live", expiresAt: { $lt: new Date() } },
       { $set: { status: "Expired" } }
     );
-
 
     const posts = await Post.find({ topics: topic }).sort({ createdAt: -1 });
     const response = posts.map((post) => {
@@ -324,11 +317,9 @@ router.get("/", auth, async (req, res) => {
     });
 
     res.json(response);
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 export default router;
-

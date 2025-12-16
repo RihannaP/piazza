@@ -62,7 +62,7 @@ router.post("/login", async (req, res) => {
     return res.status(400).send({ message: "Password is wrong" });
   }
 
-//   Generate an auth-token
+  //   Generate an auth-token
   const token = jwt.sign(
     { userId: user._id, username: user.username },
     process.env.TOKEN_SECRET,
