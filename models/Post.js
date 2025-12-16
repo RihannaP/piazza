@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const commentSchema = new mongoose.Schema(
+const interactionSchema = new mongoose.Schema(
   {
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -11,13 +11,15 @@ const commentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    text: {
-      type: String,
-      required: true,
-    },
+    type: { type: String, enum: ["like", "dislike", "comment"], required: true },
+    value: { type: String }, // comment text if type=comment
+    timeLeftSeconds: { type: Number, required: true }
   },
-  { timestamps: true }
+  {timestamps: true }
 );
+
+
+
 
 const postSchema = new mongoose.Schema(
   {
@@ -61,20 +63,9 @@ const postSchema = new mongoose.Schema(
       },
     },
 
-    likes: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-    dislikes: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-
-    comments: [commentSchema],
+    likes: [interactionSchema],
+    dislikes: [interactionSchema],
+    comments: [interactionSchema],
   },
   { timestamps: true }
 );

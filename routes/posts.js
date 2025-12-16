@@ -5,7 +5,17 @@ import { auth } from "../middleware/verifyToken.js";
 const router = express.Router();
 
 const isExpired = (post) => new Date() > new Date(post.expiresAt);
+const timeLeftMs = (post) => Math.max(0, new Date(post.expiresAt) - new Date());
+const timeLeftSeconds = (post) => Math.floor(timeLeftMs(post) / 1000);
 
+const groupByUser = (arr = []) => {
+  const result = {};
+  for (const item of arr) {
+    const name = item.username || "unknown";
+    result[name] = (result[name] || 0) + 1;
+  }
+  return result;
+};
 
 // POST(create) /posts  (Action 2: create post)
 router.post("/", auth, async (req, res) => {
@@ -56,34 +66,7 @@ router.post("/", auth, async (req, res) => {
   }
 });
 
-// GET (Read) /posts?topic=Tech (Action 3: browse by topic)
-router.get("/", auth, async (req, res) => {
-  try {
-    const { topic } = req.query;
 
-    if (!topic) {
-      return res
-        .status(400)
-        .json({ error: "topic query parameter is required" });
-    }
-
-    const allowed = ["Politics", "Health", "Sport", "Tech"];
-    if (!allowed.includes(topic)) {
-      return res.status(400).json({ error: "Invalid topic" });
-    }
-
-    // Optional: auto mark expired
-    // await Post.updateMany(
-    //   { status: "Live", expiresAt: { $lt: new Date() } },
-    //   { $set: { status: "Expired" } }
-    // );
-
-    const posts = await Post.find({ topics: topic }).sort({ createdAt: -1 });
-    res.json(posts);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 /// Like endpoint 
 
@@ -113,18 +96,23 @@ router.post("/:id/like", auth, async (req, res) => {
 
     // toggle like
     const already = post.likes.some(
-      (u) => String(u) === String(req.user.userId)
+      (u) => String(u.userId) === String(req.user.userId)
     );
     if (already) {
       post.likes = post.likes.filter(
-        (u) => String(u) !== String(req.user.userId)
+        (u) => String(u.userId) !== String(req.user.userId)
       );
     } else {
-      post.likes.push(req.user.userId);
+      post.likes.push({
+        userId: req.user.userId,
+        username: req.user.username,
+        type: "like",
+        timeLeftSeconds : timeLeftSeconds(post),
+      });
     }
 
     await post.save();
-    res.json({ likes: post.likes.length, dislikes: post.dislikes.length });
+    res.json(post.likes[post.likes.length - 1]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -154,18 +142,23 @@ router.post("/:id/dislike", auth, async (req, res) => {
     );
 
     const already = post.dislikes.some(
-      (u) => String(u) === String(req.user.userId)
+      (u) => String(u.userId) === String(req.user.userId)
     );
     if (already) {
       post.dislikes = post.dislikes.filter(
-        (u) => String(u) !== String(req.user.userId)
+        (u) => String(u.userId) !== String(req.user.userId)
       );
     } else {
-      post.dislikes.push(req.user.userId);
+      post.dislikes.push({
+        userId: req.user.userId,
+        username: req.user.username,
+        type: "dislike",
+        timeLeftSeconds: timeLeftSeconds(post),
+      });
     }
 
     await post.save();
-    res.json({ likes: post.likes.length, dislikes: post.dislikes.length });
+    res.json(post.dislikes[post.dislikes.length - 1]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -191,7 +184,9 @@ router.post("/:id/comment", auth, async (req, res) => {
     post.comments.push({
       userId: req.user.userId,
       username: req.user.username,
-      text,
+      type: "comment",
+      value: text,
+      timeLeftSeconds: timeLeftSeconds(post),
     });
 
     await post.save();
@@ -201,6 +196,139 @@ router.post("/:id/comment", auth, async (req, res) => {
   }
 });
 
+// /posts/active/most-interesting?topic=Tech 
+router.get("/active/most-interesting", auth, async (req, res) => {
+  try {
+
+    const { topic } = req.query;
+    if (!topic)
+      return res
+        .status(400)
+        .json({ error: "topic query parameter is required" });
+
+    const allowed = ["Politics", "Health", "Sport", "Tech"];
+    if (!allowed.includes(topic))
+      return res.status(400).json({ error: "Invalid topic" });
+
+    const posts = await Post.find({ topics: topic, status: "Live" });
+
+    if (posts.length === 0) {
+      return res.json({ message: "No active posts for this topic" });
+    }
+
+    // choose post with max (likes + dislikes)
+    let best = posts[0];
+    let bestScore = (best.likes?.length || 0) + (best.dislikes?.length || 0);
+
+    for (const p of posts) {
+      const score = (p.likes?.length || 0) + (p.dislikes?.length || 0);
+      if (score > bestScore) {
+        best = p;
+        bestScore = score;
+      }
+    }
+
+    return res.json({ post: best, score: bestScore });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// /posts/expired?topic=Tech 
+router.get("/expired", auth, async (req, res) => {
+  try {
+
+    const { topic } = req.query;
+    if (!topic)
+      return res
+        .status(400)
+        .json({ error: "topic query parameter is required" });
+
+    const allowed = ["Politics", "Health", "Sport", "Tech"];
+    if (!allowed.includes(topic))
+      return res.status(400).json({ error: "Invalid topic" });
+
+    const expiredPosts = await Post.find({
+      topics: topic,
+      status: "Expired",
+    }).sort({ expiresAt: -1 });
+
+    return res.json(expiredPosts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET (Read) /posts?topic=Tech (Action 3: browse by topic)
+router.get("/", auth, async (req, res) => {
+  try {
+    const { topic } = req.query;
+
+    if (!topic) {
+      return res
+        .status(400)
+        .json({ error: "topic query parameter is required" });
+    }
+
+    const allowed = ["Politics", "Health", "Sport", "Tech"];
+    if (!allowed.includes(topic)) {
+      return res.status(400).json({ error: "Invalid topic" });
+    }
+
+   //auto mark expired
+    await Post.updateMany(
+      { status: "Live", expiresAt: { $lt: new Date() } },
+      { $set: { status: "Expired" } }
+    );
+
+
+    const posts = await Post.find({ topics: topic }).sort({ createdAt: -1 });
+    const response = posts.map((post) => {
+      const likesByUser = groupByUser(post.likes);
+      const dislikesByUser = groupByUser(post.dislikes);
+      const commentsByUser = groupByUser(post.comments);
+
+      const commentsList = post.comments.map((c) => ({
+        userId: c.userId,
+        username: c.username,
+        text: c.value,
+        timeLeftSeconds: c.timeLeftSeconds,
+        createdAt: c.createdAt,
+      }));
+
+      return {
+        id: post._id,
+        title: post.title,
+        topics: post.topics,
+        status: post.status,
+        owner: {
+          userId: post.owner.userId,
+          username: post.owner.username,
+        },
+
+        interactions: {
+          totals: {
+            likes: post.likes.length || 0,
+            dislikes: post.dislikes.length || 0,
+            comments: post.comments.length || 0,
+          },
+          grouped: {
+            likes: likesByUser,
+            dislikes: dislikesByUser,
+            comments: commentsByUser,
+          },
+        },
+        comments: commentsList,
+      };
+    });
+
+    res.json(response);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 export default router;
 
