@@ -62,7 +62,7 @@ router.post("/", auth, async (req, res) => {
 
     res.status(201).json(post);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -89,7 +89,7 @@ router.post("/:id/like", auth, async (req, res) => {
 
     // remove from dislikes if present
     post.dislikes = post.dislikes.filter(
-      (u) => String(u) !== String(req.user.userId)
+      (u) => String(u.userId) !== String(req.user.userId)
     );
 
     // toggle like
@@ -112,7 +112,7 @@ router.post("/:id/like", auth, async (req, res) => {
     await post.save();
     res.json(post.likes[post.likes.length - 1]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -136,7 +136,7 @@ router.post("/:id/dislike", auth, async (req, res) => {
     }
 
     post.likes = post.likes.filter(
-      (u) => String(u) !== String(req.user.userId)
+      (u) => String(u.userId) !== String(req.user.userId)
     );
 
     const already = post.dislikes.some(
@@ -158,7 +158,7 @@ router.post("/:id/dislike", auth, async (req, res) => {
     await post.save();
     res.json(post.dislikes[post.dislikes.length - 1]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -172,12 +172,6 @@ router.post("/:id/comment", auth, async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ error: "Post not found" });
 
-    if (isExpired(post)) {
-      post.status = "Expired";
-      await post.save();
-      return res.status(403).json({ error: "Post expired - cannot comment" });
-    }
-
     post.comments.push({
       userId: req.user.userId,
       username: req.user.username,
@@ -189,7 +183,7 @@ router.post("/:id/comment", auth, async (req, res) => {
     await post.save();
     res.status(201).json(post.comments[post.comments.length - 1]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -226,7 +220,7 @@ router.get("/active/most-interesting", auth, async (req, res) => {
 
     return res.json({ post: best, score: bestScore });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -250,7 +244,7 @@ router.get("/expired", auth, async (req, res) => {
 
     return res.json(expiredPosts);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -318,7 +312,7 @@ router.get("/", auth, async (req, res) => {
 
     res.json(response);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
